@@ -20,10 +20,10 @@ in
     { config, pkgs, ... }:
     let
       # Standard approach -- refer to this module's options' values as `cfg`
-      cfg = config.bumper;
+      cfg = config.provider;
     in
     {
-      options.bumper.changingInputs = mkOption {
+      options.provider.changingInputs = mkOption {
         description = ''
           List of names of quickly changing inputs.
 
@@ -34,7 +34,17 @@ in
       };
 
       # Option declaration
-      options.bumper.bumpAllInputs = mkEnableOption "command to bump all inputs and commit";
+      options.provider.bumpAllInputs = mkEnableOption "command to bump all inputs and commit";
+
+      options.provider.rootDir = mkOption {
+        description = ''
+          Root.
+
+          Dir.
+        '';
+        type =  types.str;
+        default = "";
+      };
 
       # Option implementation on top of devshell module
       config.devshells.default =
@@ -43,6 +53,12 @@ in
             name = "bump-input";
             runtimeInputs = [ ];
             text = builtins.readFile ./bump-input;
+          };
+          echoScript = pkgs.writeShellApplication {
+            name = "echo-root";
+            runtimeInputs = [ ];
+            text = let devenRoot = builtins.readFile self.inputs.devenv-root.outPath;
+            in "echo ${devenRoot}";
           };
         in
         {
@@ -53,7 +69,7 @@ in
                 # This is not strictly necessary as the wrapped nix flake does the same thing, but it's an illustration of referring to the consumer flake (self.inputs)
                 assert assertMsg (builtins.elem inputName (
                   builtins.attrNames self.inputs
-                )) "Input '${inputName}' does not exist in current flake. Check bumper settings.";
+                )) "Input '${inputName}' does not exist in current flake. Check provider settings.";
                 "Bump input ${inputName}";
               name = "flake-bump-${inputName}"; # The name of the resulting script
               command = # bash
@@ -68,7 +84,17 @@ in
               command = # bash
                 "${pkgs.lib.getExe bumpScript} \"*\"";
               category = "flake management";
-            };
+            }
+
+            ++ [( {
+              help = "Root";
+              name = "flake-root";
+              command = # bash
+                "${pkgs.lib.getExe echoScript} \"*\"";
+              category = "flake root";
+            })]
+            
+            ;
         };
     }
   );
